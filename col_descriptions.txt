@@ -1,0 +1,16 @@
+id: ID of game 
+rated: Boolean. False if game is casual, True if game is ranked
+created_at: Time (in ms) of game creation
+last_move_at: Time (in ms) of game conclusion
+turns: # of turns taken from start to end of game
+victory_status: How the game ended (values=['outoftime','resign','mate','draw'])
+winner: Which color won (values=['white','black','draw'])
+increment_code: (Minutes)+(seconds gained per move). See Time Control on Wikipedia.
+white_id: Lichess site ID of White player.
+white_rating: Lichess rating of White player.
+black_id: Lichess site ID of Black player.
+black_rating: Lichess rating of Black player.
+moves: List of moves made in the game.
+opening_eco: Encyclopedia of Chess Openings code for the game's opening. See 365chess.com/eco.
+opening_name: Name of the game's opening. Counted as subtype of opening_eco.
+opening_ply: Number of moves in the game's opening.
