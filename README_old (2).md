@@ -8,11 +8,11 @@ Please fill out:
 * Instructor name: James Irving, Ph.D.
 * Blog post URL: TBD
 
-# Business Case
+# Aim
 
-For this project, we attempt to use existing data to predict the winners of chess matches, given such variables as the type of opening, game length, the ratings of the players, etc. This analysis, therefore, is for those coaches and professionals whom wish to have deeper insight into the patterns and behaviors behind wins and losses, such that those behaviors might be encouraged or mitigated as needed. 
+For this project, we attempt to use existing data to predict how chess matches might end, given such variables as the type of opening, game length, and the ratings of the players. The possible endings, underneath the column `victory_status`, are checkmate, resignation, draw, and timeout. 
 
-The possible endings, underneath the column `winner`, are White, Black, and Draw; due to having three target classes, random guessing leads to an overall accuracy rating of 33%. We should then pick models that have an overall accuracy rating that is higher than this, and we should be sure to take into account model runtime as well.
+Due to having four classes, random guessing leads to an overall accuracy rating of 25%. We should then pick models that have an overall accuracy rating that is higher than this, and we should be sure to take into account model runtime as well.
 
 # Importing, Exploration, and Preprocessing
 
@@ -25,8 +25,6 @@ warnings.filterwarnings('ignore')
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.metrics import plot_confusion_matrix
 from sklearn.model_selection import (train_test_split, GridSearchCV, 
                                      RandomizedSearchCV)
@@ -53,9 +51,6 @@ pd.options.display.float_format = '{:.2f}'.format
 df = pd.read_csv('games.csv')
 df.head()
 ```
-
-    Using TensorFlow backend.
-    
 
 
 
@@ -198,17 +193,17 @@ df.head()
 
 
 
-To reiterate (or perhaps as proof), the target column contains three unique values, and the data is whole and complete.
+To reiterate (or perhaps as proof), the target column contains four unique values, and the data is whole and complete.
 
 
 ```python
-df.winner.unique()
+df.victory_status.unique()
 ```
 
 
 
 
-    array(['white', 'black', 'draw'], dtype=object)
+    array(['outoftime', 'resign', 'mate', 'draw'], dtype=object)
 
 
 
@@ -258,13 +253,11 @@ As there is sufficient information contained in the columns regarding the openin
 
 Additionally, there is next to no information within the `created_at` and `last_move_at` columns, as the source of the data truncated the last (and arguably most important) 7 digits of the time values. Those columns should be removed as well.
 
-The column `victory_status` will be dropped as well, as failing to do so will introduce major bias to our analysis, e.g. "We knew the status of `winner` would be 'draw', as the entry in `victory_status` also said 'draw'". 
-
 Finally, the `id` should be dropped, as it also offers no valuable information.
 
 
 ```python
-df.drop(['moves','created_at','last_move_at','id','victory_status'], axis=1, inplace=True)
+df.drop(['moves','created_at','last_move_at','id'], axis=1, inplace=True)
 ```
 
 
@@ -295,6 +288,7 @@ df.head()
       <th></th>
       <th>rated</th>
       <th>turns</th>
+      <th>victory_status</th>
       <th>winner</th>
       <th>increment_code</th>
       <th>white_id</th>
@@ -311,6 +305,7 @@ df.head()
       <th>0</th>
       <td>False</td>
       <td>13</td>
+      <td>outoftime</td>
       <td>white</td>
       <td>15+2</td>
       <td>bourgris</td>
@@ -325,6 +320,7 @@ df.head()
       <th>1</th>
       <td>True</td>
       <td>16</td>
+      <td>resign</td>
       <td>black</td>
       <td>5+10</td>
       <td>a-00</td>
@@ -339,6 +335,7 @@ df.head()
       <th>2</th>
       <td>True</td>
       <td>61</td>
+      <td>mate</td>
       <td>white</td>
       <td>5+10</td>
       <td>ischia</td>
@@ -353,6 +350,7 @@ df.head()
       <th>3</th>
       <td>True</td>
       <td>61</td>
+      <td>mate</td>
       <td>white</td>
       <td>20+0</td>
       <td>daniamurashov</td>
@@ -367,6 +365,7 @@ df.head()
       <th>4</th>
       <td>True</td>
       <td>95</td>
+      <td>mate</td>
       <td>white</td>
       <td>30+3</td>
       <td>nik221107</td>
@@ -390,9 +389,10 @@ df.info()
 
     <class 'pandas.core.frame.DataFrame'>
     RangeIndex: 20058 entries, 0 to 20057
-    Data columns (total 11 columns):
+    Data columns (total 12 columns):
     rated             20058 non-null bool
     turns             20058 non-null int64
+    victory_status    20058 non-null object
     winner            20058 non-null object
     increment_code    20058 non-null object
     white_id          20058 non-null object
@@ -402,8 +402,8 @@ df.info()
     opening_eco       20058 non-null object
     opening_name      20058 non-null object
     opening_ply       20058 non-null int64
-    dtypes: bool(1), int64(4), object(6)
-    memory usage: 1.5+ MB
+    dtypes: bool(1), int64(4), object(7)
+    memory usage: 1.7+ MB
     
 
 ## How Many Features Are There?
@@ -459,6 +459,7 @@ df.head()
       <th></th>
       <th>rated</th>
       <th>turns</th>
+      <th>victory_status</th>
       <th>winner</th>
       <th>increment_code</th>
       <th>white_rating</th>
@@ -472,6 +473,7 @@ df.head()
       <th>0</th>
       <td>False</td>
       <td>13</td>
+      <td>outoftime</td>
       <td>white</td>
       <td>15+2</td>
       <td>1500</td>
@@ -483,6 +485,7 @@ df.head()
       <th>1</th>
       <td>True</td>
       <td>16</td>
+      <td>resign</td>
       <td>black</td>
       <td>5+10</td>
       <td>1322</td>
@@ -494,6 +497,7 @@ df.head()
       <th>2</th>
       <td>True</td>
       <td>61</td>
+      <td>mate</td>
       <td>white</td>
       <td>5+10</td>
       <td>1496</td>
@@ -505,6 +509,7 @@ df.head()
       <th>3</th>
       <td>True</td>
       <td>61</td>
+      <td>mate</td>
       <td>white</td>
       <td>20+0</td>
       <td>1439</td>
@@ -516,6 +521,7 @@ df.head()
       <th>4</th>
       <td>True</td>
       <td>95</td>
+      <td>mate</td>
       <td>white</td>
       <td>30+3</td>
       <td>1523</td>
@@ -561,6 +567,7 @@ df.head()
       <th></th>
       <th>rated</th>
       <th>turns</th>
+      <th>victory_status</th>
       <th>winner</th>
       <th>increment_code</th>
       <th>white_rating</th>
@@ -574,6 +581,7 @@ df.head()
       <th>0</th>
       <td>False</td>
       <td>13</td>
+      <td>outoftime</td>
       <td>white</td>
       <td>15+2</td>
       <td>1500</td>
@@ -585,6 +593,7 @@ df.head()
       <th>1</th>
       <td>True</td>
       <td>16</td>
+      <td>resign</td>
       <td>black</td>
       <td>5+10</td>
       <td>1322</td>
@@ -596,6 +605,7 @@ df.head()
       <th>2</th>
       <td>True</td>
       <td>61</td>
+      <td>mate</td>
       <td>white</td>
       <td>5+10</td>
       <td>1496</td>
@@ -607,6 +617,7 @@ df.head()
       <th>3</th>
       <td>True</td>
       <td>61</td>
+      <td>mate</td>
       <td>white</td>
       <td>20+0</td>
       <td>1439</td>
@@ -618,6 +629,7 @@ df.head()
       <th>4</th>
       <td>True</td>
       <td>95</td>
+      <td>mate</td>
       <td>white</td>
       <td>30+3</td>
       <td>1523</td>
@@ -635,28 +647,30 @@ While we're at it, we should map our target column to numerical values. We'll do
 
 
 ```python
-df['winner'].value_counts(normalize=True)
+df['victory_status'].value_counts(normalize=True)
 ```
 
 
 
 
-    white   0.50
-    black   0.45
-    draw    0.05
-    Name: winner, dtype: float64
+    resign      0.56
+    mate        0.32
+    outoftime   0.08
+    draw        0.05
+    Name: victory_status, dtype: float64
 
 
 
 
 ```python
-winner_map = {
-    "white": 0,
-    "black": 1,
-    "draw": 2
+victory_map = {
+    "resign": 0,
+    "mate": 1,
+    "outoftime": 2,
+    "draw": 3
     }
 
-df['winner'] = df['winner'].map(winner_map)
+df['victory_status'] = df['victory_status'].map(victory_map)
 df.head()
 ```
 
@@ -683,6 +697,7 @@ df.head()
       <th></th>
       <th>rated</th>
       <th>turns</th>
+      <th>victory_status</th>
       <th>winner</th>
       <th>increment_code</th>
       <th>white_rating</th>
@@ -696,7 +711,8 @@ df.head()
       <th>0</th>
       <td>False</td>
       <td>13</td>
-      <td>0</td>
+      <td>2</td>
+      <td>white</td>
       <td>15+2</td>
       <td>1500</td>
       <td>1191</td>
@@ -707,7 +723,8 @@ df.head()
       <th>1</th>
       <td>True</td>
       <td>16</td>
-      <td>1</td>
+      <td>0</td>
+      <td>black</td>
       <td>5+10</td>
       <td>1322</td>
       <td>1261</td>
@@ -718,7 +735,8 @@ df.head()
       <th>2</th>
       <td>True</td>
       <td>61</td>
-      <td>0</td>
+      <td>1</td>
+      <td>white</td>
       <td>5+10</td>
       <td>1496</td>
       <td>1500</td>
@@ -729,7 +747,8 @@ df.head()
       <th>3</th>
       <td>True</td>
       <td>61</td>
-      <td>0</td>
+      <td>1</td>
+      <td>white</td>
       <td>20+0</td>
       <td>1439</td>
       <td>1454</td>
@@ -740,7 +759,8 @@ df.head()
       <th>4</th>
       <td>True</td>
       <td>95</td>
-      <td>0</td>
+      <td>1</td>
+      <td>white</td>
       <td>30+3</td>
       <td>1523</td>
       <td>1469</td>
@@ -755,7 +775,9 @@ df.head()
 
 ## Class Imbalance
 
-While we're here, let's take a moment to understand our class imbalance issue. Random guessing, as stated before, gives an overall accuracy of 33%. "Weighted guessing"--that is, putting 50% of our guesses as White, 45% of our guesses as Black, and 5% of our guesses as Draw--gives an overall accuracy of 45.5%. Further still, simply guessing every game as ending in White victory would net us 50%. We should then instead look for models that surpass this accuracy. 
+While we're here, let's take a moment to understand our class imbalance issue. Random guessing, as stated before, gives an overall accuracy of 25%. "Weighted guessing"--that is, putting 56% of our guesses in class 0, 32% of our guesses in class 1, and so on--gives an overall accuracy of 42.5%. We should then instead look for models that surpass this accuracy. 
+
+Due to the extremely low occurrence of the `outoftime` status, we would expect that to be difficult to predict, despite the existence of SMOTE. However, we don't have this problem with the `draw` category, as our `winner` column contains whether or not the match ended in a draw. Drawing upon the data given in one ending column to predict the data in another ending column, especially in such a literal way, might seem like a tautology. That is because it is. As such, we can expect perfect, or near-perfect, prediction of class 3. However, we'll be temporarily removing this feature from our data when we run our models, just to illustrate the difference.
 
 ## More Data Cleanup and One-Hot Encoding
 
@@ -792,6 +814,7 @@ df.head()
       <th></th>
       <th>rated</th>
       <th>turns</th>
+      <th>victory_status</th>
       <th>winner</th>
       <th>increment_code</th>
       <th>white_rating</th>
@@ -805,7 +828,8 @@ df.head()
       <th>0</th>
       <td>0</td>
       <td>13</td>
-      <td>0</td>
+      <td>2</td>
+      <td>white</td>
       <td>15+2</td>
       <td>1500</td>
       <td>1191</td>
@@ -816,7 +840,8 @@ df.head()
       <th>1</th>
       <td>1</td>
       <td>16</td>
-      <td>1</td>
+      <td>0</td>
+      <td>black</td>
       <td>5+10</td>
       <td>1322</td>
       <td>1261</td>
@@ -827,7 +852,8 @@ df.head()
       <th>2</th>
       <td>1</td>
       <td>61</td>
-      <td>0</td>
+      <td>1</td>
+      <td>white</td>
       <td>5+10</td>
       <td>1496</td>
       <td>1500</td>
@@ -838,7 +864,8 @@ df.head()
       <th>3</th>
       <td>1</td>
       <td>61</td>
-      <td>0</td>
+      <td>1</td>
+      <td>white</td>
       <td>20+0</td>
       <td>1439</td>
       <td>1454</td>
@@ -849,7 +876,8 @@ df.head()
       <th>4</th>
       <td>1</td>
       <td>95</td>
-      <td>0</td>
+      <td>1</td>
+      <td>white</td>
       <td>30+3</td>
       <td>1523</td>
       <td>1469</td>
@@ -893,6 +921,7 @@ df.head()
       <th></th>
       <th>rated</th>
       <th>turns</th>
+      <th>victory_status</th>
       <th>winner</th>
       <th>white_rating</th>
       <th>black_rating</th>
@@ -906,7 +935,8 @@ df.head()
       <th>0</th>
       <td>0</td>
       <td>13</td>
-      <td>0</td>
+      <td>2</td>
+      <td>white</td>
       <td>1500</td>
       <td>1191</td>
       <td>5</td>
@@ -917,7 +947,8 @@ df.head()
       <th>1</th>
       <td>1</td>
       <td>16</td>
-      <td>1</td>
+      <td>0</td>
+      <td>black</td>
       <td>1322</td>
       <td>1261</td>
       <td>4</td>
@@ -928,7 +959,8 @@ df.head()
       <th>2</th>
       <td>1</td>
       <td>61</td>
-      <td>0</td>
+      <td>1</td>
+      <td>white</td>
       <td>1496</td>
       <td>1500</td>
       <td>3</td>
@@ -939,7 +971,8 @@ df.head()
       <th>3</th>
       <td>1</td>
       <td>61</td>
-      <td>0</td>
+      <td>1</td>
+      <td>white</td>
       <td>1439</td>
       <td>1454</td>
       <td>3</td>
@@ -950,7 +983,8 @@ df.head()
       <th>4</th>
       <td>1</td>
       <td>95</td>
-      <td>0</td>
+      <td>1</td>
+      <td>white</td>
       <td>1523</td>
       <td>1469</td>
       <td>5</td>
@@ -970,22 +1004,23 @@ df.info()
 
     <class 'pandas.core.frame.DataFrame'>
     RangeIndex: 20058 entries, 0 to 20057
-    Data columns (total 8 columns):
-    rated           20058 non-null int64
-    turns           20058 non-null int64
-    winner          20058 non-null int64
-    white_rating    20058 non-null int64
-    black_rating    20058 non-null int64
-    opening_ply     20058 non-null int64
-    eco_category    20058 non-null object
-    game_time       20058 non-null int64
-    dtypes: int64(7), object(1)
-    memory usage: 1.2+ MB
+    Data columns (total 9 columns):
+    rated             20058 non-null int64
+    turns             20058 non-null int64
+    victory_status    20058 non-null int64
+    winner            20058 non-null object
+    white_rating      20058 non-null int64
+    black_rating      20058 non-null int64
+    opening_ply       20058 non-null int64
+    eco_category      20058 non-null object
+    game_time         20058 non-null int64
+    dtypes: int64(7), object(2)
+    memory usage: 1.4+ MB
     
 
 
 ```python
-df = pd.get_dummies(df, columns=['eco_category'])
+df = pd.get_dummies(df, columns=['winner','eco_category'])
 
 df
 ```
@@ -1013,11 +1048,14 @@ df
       <th></th>
       <th>rated</th>
       <th>turns</th>
-      <th>winner</th>
+      <th>victory_status</th>
       <th>white_rating</th>
       <th>black_rating</th>
       <th>opening_ply</th>
       <th>game_time</th>
+      <th>winner_black</th>
+      <th>winner_draw</th>
+      <th>winner_white</th>
       <th>eco_category_A</th>
       <th>eco_category_B</th>
       <th>eco_category_C</th>
@@ -1030,11 +1068,14 @@ df
       <th>0</th>
       <td>0</td>
       <td>13</td>
-      <td>0</td>
+      <td>2</td>
       <td>1500</td>
       <td>1191</td>
       <td>5</td>
       <td>15</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
       <td>0</td>
       <td>0</td>
       <td>0</td>
@@ -1045,11 +1086,14 @@ df
       <th>1</th>
       <td>1</td>
       <td>16</td>
-      <td>1</td>
+      <td>0</td>
       <td>1322</td>
       <td>1261</td>
       <td>4</td>
       <td>5</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
       <td>0</td>
       <td>1</td>
       <td>0</td>
@@ -1060,11 +1104,14 @@ df
       <th>2</th>
       <td>1</td>
       <td>61</td>
-      <td>0</td>
+      <td>1</td>
       <td>1496</td>
       <td>1500</td>
       <td>3</td>
       <td>5</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
       <td>0</td>
       <td>0</td>
       <td>1</td>
@@ -1075,11 +1122,14 @@ df
       <th>3</th>
       <td>1</td>
       <td>61</td>
-      <td>0</td>
+      <td>1</td>
       <td>1439</td>
       <td>1454</td>
       <td>3</td>
       <td>20</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
       <td>0</td>
       <td>0</td>
       <td>0</td>
@@ -1090,7 +1140,7 @@ df
       <th>4</th>
       <td>1</td>
       <td>95</td>
-      <td>0</td>
+      <td>1</td>
       <td>1523</td>
       <td>1469</td>
       <td>5</td>
@@ -1100,9 +1150,15 @@ df
       <td>1</td>
       <td>0</td>
       <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
     </tr>
     <tr>
       <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
       <td>...</td>
       <td>...</td>
       <td>...</td>
@@ -1125,6 +1181,9 @@ df
       <td>1220</td>
       <td>2</td>
       <td>10</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
       <td>1</td>
       <td>0</td>
       <td>0</td>
@@ -1143,6 +1202,9 @@ df
       <td>1</td>
       <td>0</td>
       <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
       <td>0</td>
       <td>0</td>
     </tr>
@@ -1150,11 +1212,14 @@ df
       <th>20055</th>
       <td>1</td>
       <td>35</td>
-      <td>0</td>
+      <td>1</td>
       <td>1219</td>
       <td>1286</td>
       <td>3</td>
       <td>10</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
       <td>0</td>
       <td>0</td>
       <td>0</td>
@@ -1171,6 +1236,9 @@ df
       <td>4</td>
       <td>10</td>
       <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
       <td>1</td>
       <td>0</td>
       <td>0</td>
@@ -1185,6 +1253,9 @@ df
       <td>1339</td>
       <td>3</td>
       <td>10</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
       <td>0</td>
       <td>0</td>
       <td>0</td>
@@ -1193,7 +1264,7 @@ df
     </tr>
   </tbody>
 </table>
-<p>20058 rows × 12 columns</p>
+<p>20058 rows × 15 columns</p>
 </div>
 
 
@@ -1204,25 +1275,19 @@ Now that we've got our data largely in the form we want, we can begin our modeli
 
 
 ```python
-y = df['winner']
-X = df.drop('winner', axis=1)
+y = df['victory_status']
+X = df.drop('victory_status', axis=1)
 
-def train_test(df=df, drop_cols=['winner']):
+def train_test(df=df, drop_cols=['victory_status']):
     
-    """Takes in a DataFrame and any columns to drop from training
-    data as inputs. Returns a train-test split of that data."""
-    
-    y = df['winner']
+    y = df['victory_status']
     X = df.drop(drop_cols, axis=1)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25)
     
     return X_train, X_test, y_train, y_test
 
 
-def scale(df=df, drop_cols=['winner']):
-    
-    """Takes in a DataFrame and any columns to drop from training data
-    as inputs. Returns a Standard Scaled train-test split."""
+def scale(df=df, drop_cols=['victory_status']):
     
     scaler = StandardScaler()
     X_train, X_test, y_train, y_test = train_test(df=df, drop_cols=drop_cols)
@@ -1233,11 +1298,7 @@ def scale(df=df, drop_cols=['winner']):
     return X_train_scaled, X_test_scaled, y_train, y_test
 
 
-def smote(df=df, scaled=True, verbose=False, drop_cols=['winner']):
-    
-    """Takes in a DataFrame and any columns to drop from training data
-    as inputs. Returns an oversampled train-test split. Optionally, will
-    Standard Scale the data as well."""
+def smote(df=df, scaled=True, verbose=False, drop_cols=['victory_status']):
     
     smote=SMOTE()
     
@@ -1257,21 +1318,13 @@ def smote(df=df, scaled=True, verbose=False, drop_cols=['winner']):
     
     
 def print_metrics(labels, preds):
-    
-    """Takes test labels and predicted labels as inputs.
-    Returns precision, recall, accuracy, and f1 scores."""
-    
     print(f"Precision Score: {precision_score(labels, preds, average=None)}")
     print(f"Recall Score: {recall_score(labels, preds, average=None)}")
     print(f"Accuracy Score: {accuracy_score(labels, preds)}")
     print(f"F1 Score: {f1_score(labels, preds, average=None)}")
     
     
-def plot_importance(model,top_n=20,figsize=(10,10), drop_cols=['winner']):
-    
-    """Returns a plot of features ranked by their importance, listed from
-    most to least important."""
-    
+def plot_importance(model,top_n=20,figsize=(10,10), drop_cols=['victory_status']):
     df_importance = pd.Series(model.feature_importances_,
                               index=df.drop(drop_cols, axis=1).columns)
     df_importance.sort_values(ascending=True).tail(top_n).plot(
@@ -1294,21 +1347,20 @@ print(clf.score(X_train, y_train))
 print(clf.score(X_test, y_test))
 ```
 
-    0.7174100910722595
-    0.5794616151545364
+    0.7080369607126238
+    0.594616151545364
     
 
 
 ```python
-import seaborn as sns
-
-
-
-plot_confusion_matrix(clf, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd');
+plot_confusion_matrix(clf, X_test, y_test, normalize='true')
 ```
 
 
-![png](output_32_0.png)
+
+
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a00478e780>
+
 
 
 ### KNN With SMOTE
@@ -1326,27 +1378,29 @@ print(clf.score(X_train, y_train))
 print(clf.score(X_test, y_test))
 ```
 
-    2    7472
-    1    7472
-    0    7472
+    3    8364
+    2    8364
+    1    8364
+    0    8364
     dtype: int64
-    0    2529
-    1    2233
-    2     253
-    Name: winner, dtype: int64
-    0.7863579586009993
-    0.5136590229312064
+    0    2783
+    1    1582
+    2     425
+    3     225
+    Name: victory_status, dtype: int64
+    0.8544356767097083
+    0.4945164506480558
     
 
 
 ```python
-plot_confusion_matrix(clf, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(clf, X_test, y_test, normalize='true')
 ```
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a39632a898>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a005261320>
 
 
 
@@ -1354,7 +1408,7 @@ plot_confusion_matrix(clf, X_test, y_test, normalize='true', display_labels=['Wh
 ![png](output_35_1.png)
 
 
-With SMOTE, we've gained a much higher degree of homogeneity at the cost of overall accuracy and overfitting. Let's try a different model.
+With SMOTE, we've gained a much higher degree of homogeneity at the cost of overall accuracy. Let's try a different model.
 
 ## Vanilla Decision Tree
 
@@ -1371,27 +1425,29 @@ print(tree.score(X_train, y_train))
 print(tree.score(X_test, y_test))
 ```
 
-    2    7514
-    1    7514
-    0    7514
+    3    8360
+    2    8360
+    1    8360
+    0    8360
     dtype: int64
-    0    2487
-    1    2281
-    2     247
-    Name: winner, dtype: int64
+    0    2787
+    1    1580
+    2     435
+    3     213
+    Name: victory_status, dtype: int64
     1.0
-    0.5509471585244268
+    0.53678963110668
     
 
 
 ```python
-plot_confusion_matrix(tree, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(tree, X_test, y_test, normalize='true')
 ```
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a3965750b8>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a07f6d8710>
 
 
 
@@ -1413,7 +1469,7 @@ plot_importance(tree.fit(X_train, y_train));
 
 ```python
 tree = DecisionTreeClassifier(max_depth=10)
-X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True)
+X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True, drop_cols=['victory_status','winner_draw'])
 
 tree.fit(X_train, y_train)
 
@@ -1422,25 +1478,27 @@ test_preds = tree.predict(X_test)
 print(tree.score(X_train, y_train))
 print(tree.score(X_test, y_test))
 
-plot_confusion_matrix(tree, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(tree, X_test, y_test, normalize='true')
 ```
 
-    2    7515
-    1    7515
-    0    7515
+    3    8419
+    2    8419
+    1    8419
+    0    8419
     dtype: int64
-    0    2486
-    1    2274
-    2     255
-    Name: winner, dtype: int64
-    0.6703925482368596
-    0.5308075772681954
+    0    2728
+    1    1610
+    2     444
+    3     233
+    Name: victory_status, dtype: int64
+    0.7217899988122105
+    0.5335992023928215
     
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a3969b5080>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a00494d9b0>
 
 
 
@@ -1450,11 +1508,65 @@ plot_confusion_matrix(tree, X_test, y_test, normalize='true', display_labels=['W
 
 
 ```python
-plot_importance(tree.fit(X_train, y_train));
+plot_importance(tree.fit(X_train, y_train),drop_cols=['victory_status','winner_draw']);
 ```
 
 
 ![png](output_43_0.png)
+
+
+### Low Depth Decision Tree With Features Removed
+
+
+```python
+tree = DecisionTreeClassifier(max_depth=10)
+X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True, 
+                                         drop_cols=['victory_status',
+                                                    'winner_draw',
+                                                    'winner_black'])
+
+tree.fit(X_train, y_train)
+
+test_preds = tree.predict(X_test)
+
+print(tree.score(X_train, y_train))
+print(tree.score(X_test, y_test))
+
+plot_confusion_matrix(tree, X_test, y_test, normalize='true')
+```
+
+    3    8381
+    2    8381
+    1    8381
+    0    8381
+    dtype: int64
+    0    2766
+    1    1600
+    2     418
+    3     231
+    Name: victory_status, dtype: int64
+    0.6251342321918626
+    0.46241276171485546
+    
+
+
+
+
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a004cbed30>
+
+
+
+
+![png](output_45_2.png)
+
+
+
+```python
+plot_importance(tree.fit(X_train, y_train),drop_cols=['victory_status','winner_draw','winner_black']);
+```
+
+
+![png](output_46_0.png)
 
 
 ## Vanilla Bagging
@@ -1463,38 +1575,40 @@ plot_importance(tree.fit(X_train, y_train));
 ```python
 X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True)
 
-bag = BaggingClassifier(n_estimators=100)
+bag = BaggingClassifier(n_estimators=10)
 bag.fit(X_train, y_train)
 print(bag.score(X_train, y_train))
 print(bag.score(X_test, y_test))
 ```
 
-    2    7538
-    1    7538
-    0    7538
+    3    8348
+    2    8348
+    1    8348
+    0    8348
     dtype: int64
-    0    2463
-    1    2315
-    2     237
-    Name: winner, dtype: int64
-    1.0
-    0.6017946161515454
+    0    2799
+    1    1587
+    2     396
+    3     233
+    Name: victory_status, dtype: int64
+    0.9920340201245808
+    0.5942173479561316
     
 
 
 ```python
-plot_confusion_matrix(bag, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(bag, X_test, y_test, normalize='true')
 ```
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a39696bb00>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a005dc7518>
 
 
 
 
-![png](output_46_1.png)
+![png](output_49_1.png)
 
 
 ## Vanilla Random Forest
@@ -1511,32 +1625,34 @@ print(rf.score(X_train, y_train))
 print(rf.score(X_test, y_test))
 ```
 
-    2    7468
-    1    7468
-    0    7468
+    3    8342
+    2    8342
+    1    8342
+    0    8342
     dtype: int64
-    0    2533
-    1    2251
-    2     231
-    Name: winner, dtype: int64
+    0    2805
+    1    1609
+    2     370
+    3     231
+    Name: victory_status, dtype: int64
     1.0
-    0.6406779661016949
+    0.6374875373878365
     
 
 
 ```python
-plot_confusion_matrix(rf, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(rf, X_test, y_test, normalize='true')
 ```
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a3969ff438>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a0059f8588>
 
 
 
 
-![png](output_49_1.png)
+![png](output_52_1.png)
 
 
 
@@ -1545,7 +1661,7 @@ plot_importance(rf.fit(X_train, y_train));
 ```
 
 
-![png](output_50_0.png)
+![png](output_53_0.png)
 
 
 ### Low Depth Random Forest
@@ -1559,24 +1675,24 @@ print(rf.score(X_train, y_train))
 print(rf.score(X_test, y_test))
 ```
 
-    0.783252990537404
-    0.6161515453639083
+    0.7761028530328459
+    0.6279162512462613
     
 
 
 ```python
-plot_confusion_matrix(rf, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(rf, X_test, y_test, normalize='true')
 ```
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a396ea58d0>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a0059f8fd0>
 
 
 
 
-![png](output_53_1.png)
+![png](output_56_1.png)
 
 
 
@@ -1585,7 +1701,61 @@ plot_importance(rf.fit(X_train, y_train));
 ```
 
 
-![png](output_54_0.png)
+![png](output_57_0.png)
+
+
+### Low Depth Random Forest With Features Removed
+
+
+```python
+X_train, X_test, y_train, y_test = smote(scaled=False, verbose=True, 
+                                         drop_cols=['victory_status',
+                                                    'winner_draw',
+                                                    'winner_white'])
+
+rf = RandomForestClassifier(max_depth=10)
+
+rf.fit(X_train, y_train)
+print(rf.score(X_train, y_train))
+print(rf.score(X_test, y_test))
+
+plot_confusion_matrix(rf, X_test, y_test, normalize='true')
+```
+
+    3    8366
+    2    8366
+    1    8366
+    0    8366
+    dtype: int64
+    0    2781
+    1    1568
+    2     433
+    3     233
+    Name: victory_status, dtype: int64
+    0.6658498685154196
+    0.5485543369890329
+    
+
+
+
+
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a005bb0780>
+
+
+
+
+![png](output_59_2.png)
+
+
+
+```python
+plot_importance(rf.fit(X_train, y_train), drop_cols=['victory_status',
+                                                     'winner_draw',
+                                                     'winner_white']);
+```
+
+
+![png](output_60_0.png)
 
 
 ## Low Depth Extra Trees
@@ -1601,32 +1771,34 @@ print(et.score(X_train, y_train))
 print(et.score(X_test, y_test))
 ```
 
-    2    7525
-    1    7525
-    0    7525
+    3    8417
+    2    8417
+    1    8417
+    0    8417
     dtype: int64
-    0    2476
-    1    2297
-    2     242
-    Name: winner, dtype: int64
-    0.7035215946843854
-    0.6001994017946162
+    0    2730
+    1    1634
+    2     421
+    3     230
+    Name: victory_status, dtype: int64
+    0.7118331947249614
+    0.6161515453639083
     
 
 
 ```python
-plot_confusion_matrix(et, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(et, X_test, y_test, normalize='true')
 ```
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a396f52da0>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a005f30c18>
 
 
 
 
-![png](output_57_1.png)
+![png](output_63_1.png)
 
 
 
@@ -1635,7 +1807,61 @@ plot_importance(et.fit(X_train, y_train));
 ```
 
 
-![png](output_58_0.png)
+![png](output_64_0.png)
+
+
+### Low Depth Extra Trees With Features Removed
+
+
+```python
+X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True,
+                                        drop_cols=['victory_status',
+                                                     'winner_draw',
+                                                     'winner_white'])
+
+et = ExtraTreesClassifier(n_estimators=100, max_depth=10)
+et.fit(X_train, y_train)
+
+print(et.score(X_train, y_train))
+print(et.score(X_test, y_test))
+
+plot_confusion_matrix(et, X_test, y_test, normalize='true')
+```
+
+    3    8384
+    2    8384
+    1    8384
+    0    8384
+    dtype: int64
+    0    2763
+    1    1605
+    2     416
+    3     231
+    Name: victory_status, dtype: int64
+    0.5358122614503816
+    0.3523429710867398
+    
+
+
+
+
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a0060d3c18>
+
+
+
+
+![png](output_66_2.png)
+
+
+
+```python
+plot_importance(et.fit(X_train, y_train), drop_cols=['victory_status',
+                                                     'winner_draw',
+                                                     'winner_white']);
+```
+
+
+![png](output_67_0.png)
 
 
 ## Support Vector Machines
@@ -1644,36 +1870,38 @@ plot_importance(et.fit(X_train, y_train));
 ```python
 X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True)
 
-clf = SVC(gamma='auto', C=10)
+clf = SVC(gamma='auto')
 clf.fit(X_train, y_train)
 
 print(clf.score(X_train, y_train))
 print(clf.score(X_test, y_test))
 
-plot_confusion_matrix(clf, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(clf, X_test, y_test, normalize='true')
 ```
 
-    2    7532
-    1    7532
-    0    7532
+    3    8384
+    2    8384
+    1    8384
+    0    8384
     dtype: int64
-    0    2469
-    1    2289
-    2     257
-    Name: winner, dtype: int64
-    0.6234289254735351
-    0.5371884346959123
+    0    2763
+    1    1569
+    2     429
+    3     254
+    Name: victory_status, dtype: int64
+    0.650793177480916
+    0.5046859421734795
     
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a3968724a8>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a00476c160>
 
 
 
 
-![png](output_60_2.png)
+![png](output_69_2.png)
 
 
 
@@ -1686,27 +1914,27 @@ for kernel in kernels:
     clf.fit(X_train, y_train)
     print(clf.score(X_train, y_train))
     print(clf.score(X_test, y_test))
-    plot_confusion_matrix(clf, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+    plot_confusion_matrix(clf, X_test, y_test, normalize='true')
 ```
 
-    0.5500973623650204
-    0.5234297108673978
-    0.5755885997521685
-    0.5274177467597209
-    0.3971941936625952
-    0.39740777666999005
+    0.5876968034351145
+    0.5369890329012961
+    0.6365100190839694
+    0.5076769690927219
+    0.4999701812977099
+    0.3720837487537388
     
 
 
-![png](output_61_1.png)
+![png](output_70_1.png)
 
 
 
-![png](output_61_2.png)
+![png](output_70_2.png)
 
 
 
-![png](output_61_3.png)
+![png](output_70_3.png)
 
 
 # Ensemble Methods
@@ -1722,70 +1950,35 @@ ada.fit(X_train, y_train)
 print(ada.score(X_train, y_train))
 print(ada.score(X_test, y_test))
 
-plot_confusion_matrix(ada, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(ada, X_test, y_test, normalize='true')
 ```
 
-    2    7547
-    1    7547
-    0    7547
+    3    8324
+    2    8324
+    1    8324
+    0    8324
     dtype: int64
-    0    2454
-    1    2321
-    2     240
-    Name: winner, dtype: int64
-    0.8938209443045801
-    0.6568295114656032
+    0    2823
+    1    1566
+    2     405
+    3     221
+    Name: victory_status, dtype: int64
+    0.852835175396444
+    0.5880358923230309
     
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a3979d5e80>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a005b365f8>
 
 
 
 
-![png](output_64_2.png)
+![png](output_73_2.png)
 
 
-## Max Depth Gradient Boost
-
-
-```python
-X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True)
-
-grad = GradientBoostingClassifier(max_depth=None)
-grad.fit(X_train, y_train)
-print(grad.score(X_train, y_train))
-print(grad.score(X_test, y_test))
-
-plot_confusion_matrix(grad, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
-```
-
-    2    7457
-    1    7457
-    0    7457
-    dtype: int64
-    0    2544
-    1    2223
-    2     248
-    Name: winner, dtype: int64
-    1.0
-    0.6536390827517448
-    
-
-
-
-
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a397d40cc0>
-
-
-
-
-![png](output_66_2.png)
-
-
-### Low Depth Gradient Boost
+## Low Depth Gradient Boost
 
 
 ```python
@@ -1796,173 +1989,32 @@ grad.fit(X_train, y_train)
 print(grad.score(X_train, y_train))
 print(grad.score(X_test, y_test))
 
-plot_confusion_matrix(grad, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(grad, X_test, y_test, normalize='true')
 ```
 
-    2    7481
-    1    7481
-    0    7481
+    3    8380
+    2    8380
+    1    8380
+    0    8380
     dtype: int64
-    0    2520
-    1    2267
-    2     228
-    Name: winner, dtype: int64
-    0.9860090005792452
-    0.8103688933200399
+    0    2767
+    1    1579
+    2     442
+    3     227
+    Name: victory_status, dtype: int64
+    0.9616050119331743
+    0.6207377866400797
     
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a397d660f0>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a0064b1828>
 
 
 
 
-![png](output_68_2.png)
-
-
-### Low Depth Gradient Boost with Gridsearch
-
-So far, the Gradient Boosting algorithm, while still quite unable to accurately predict 'Draw' endings, has produced the highest degree of overall test accuracy, albeit somewhat overfitting to the training data. After looking at more ensemble methods, it would be worth pursuing hyperparameter tuning for this model, in order to either increase the generalizability, or to increase test accuracy for 'Draw' outcomes. In discussing which parameters to tune, and which value choices to give the gridsearch algorithm, it is worth mentioning that, as the dataset contains over 20,000 rows, the samples required to create a new split or leaf in our gradient boosted random forest should be increased. Additionally, the maximum tree depth should be limited so as to prevent our previous case of overfitting. Finally, the learning rate will be tweaked in the aim of attaining a higher degree of granularity in the gradient descent.
-
-
-```python
-X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True)
-
-go_ahead = input("Cell will take several minutes to run. Do you wish to run this cell (y/n)? ")
-
-if go_ahead == 'y':
-
-    grad = GradientBoostingClassifier()
-    grid = {'learning_rate': [0.1,0.01],
-            'max_depth': [3,5,10],
-            'min_samples_split':[20,30,50],
-            'min_samples_leaf':[10,30]}
-
-    gridsearch = GridSearchCV(grad, param_grid=grid, cv=5)
-
-    grad_cv = gridsearch.fit(X_train, y_train)
-    
-    best_params = grad_cv.best_params_
-
-    print(best_params)
-    
-else:
-    
-    best_params = {'learning_rate': 0.1, 
-                   'max_depth': 10, 
-                   'min_samples_leaf': 10, 
-                   'min_samples_split': 20}
-    
-    print(best_params)
-```
-
-    2    7450
-    1    7450
-    0    7450
-    dtype: int64
-    0    2551
-    1    2239
-    2     225
-    Name: winner, dtype: int64
-    Cell will take several minutes to run. Do you wish to run this cell (y/n)? n
-    {'learning_rate': 0.1, 'max_depth': 10, 'min_samples_leaf': 10, 'min_samples_split': 20}
-    
-
-
-```python
-grad = GradientBoostingClassifier(**best_params)
-grad.fit(X_train, y_train)
-print(grad.score(X_train, y_train))
-print(grad.score(X_test, y_test))
-```
-
-    0.959910514541387
-    0.8111665004985045
-    
-
-
-```python
-sns.set_style(style='ticks')
-plot_confusion_matrix(grad, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
-```
-
-
-
-
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a39689d6d8>
-
-
-
-
-![png](output_72_1.png)
-
-
-
-```python
-sns.set_style(style='darkgrid')
-plot_importance(grad.fit(X_train, y_train))
-plt.xlabel("Feature Importance")
-plt.ylabel("Feature Name")
-plt.xticks(ticks=[0,.05,.1,.15,.2,.25,.3,.35,.4], 
-           labels=['0%','5%','10%','15%','20%','25%','30%','35%','40%'])
-
-plt.yticks(ticks=range(11), 
-           labels=['Opening Type E','Opening Type D','Opening Type A','Opening Type C',
-                   'Opening Type B','Ranked','Opening Length','Black Rating','White Rating',
-                  'Game Time','Turn Count'])
-plt.show()
-```
-
-
-![png](output_73_0.png)
-
-
-A gridsearch of hyperparameters has resulted in an accuracy increase of less than 1%. A bit underwhelming, especially given the time it took the gridsearch to run, but the level of overfit has gone down somewhat. Regardless, let's try a few other prediction methods.
-
-
-```python
-plt.figure(figsize=(10,10))
-sns.barplot(y=df['turns'], x=df['winner'])
-sns.set_context('poster')
-plt.xlabel("Winner")
-plt.xticks(ticks=range(3), labels=['White','Black','Draw'], rotation=45)
-plt.ylabel("Average Turn Count Per Game")
-plt.title("Average Turn Count Per Outcome")
-```
-
-
-
-
-    Text(0.5, 1.0, 'Average Turn Count Per Outcome')
-
-
-
-
-![png](output_75_1.png)
-
-
-
-```python
-plt.figure(figsize=(10,10))
-sns.barplot(y=df['game_time'], x=df['winner'])
-sns.set_context('poster')
-plt.xlabel("Winner")
-plt.xticks(ticks=range(3), labels=['White','Black','Draw'], rotation=45)
-plt.ylabel("Average Starting Time Per Game")
-plt.title("Average Starting Game Time Per Outcome")
-```
-
-
-
-
-    Text(0.5, 1.0, 'Average Starting Game Time Per Outcome')
-
-
-
-
-![png](output_76_1.png)
+![png](output_75_2.png)
 
 
 ## Vanilla XGBoost
@@ -1977,33 +2029,34 @@ print(xgb_rf.score(X_train, y_train))
 print(xgb_rf.score(X_test,y_test))
 ```
 
-    2    7521
-    1    7521
-    0    7521
+    3    8378
+    2    8378
+    1    8378
+    0    8378
     dtype: int64
-    0    2480
-    1    2276
-    2     259
-    Name: winner, dtype: int64
-    0.5661924389487214
-    0.5226321036889332
+    0    2769
+    1    1579
+    2     431
+    3     236
+    Name: victory_status, dtype: int64
+    0.6142874194318453
+    0.481555333998006
     
 
 
 ```python
-
-plot_confusion_matrix(xgb_rf, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(xgb_rf, X_test, y_test, normalize='true')
 ```
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a3979d5c50>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a007c4b9e8>
 
 
 
 
-![png](output_79_1.png)
+![png](output_78_1.png)
 
 
 ### High Depth XGBoost
@@ -2020,27 +2073,59 @@ print(xgb_rf.score(X_train, y_train))
 print(xgb_rf.score(X_test,y_test))
 ```
 
-    2    7512
-    1    7512
-    0    7512
+    3    8378
+    2    8378
+    1    8378
+    0    8378
     dtype: int64
-    0    2489
-    1    2270
-    2     256
-    Name: winner, dtype: int64
-    0.7663294284700035
-    0.6071784646061814
+    0    2769
+    1    1582
+    2     445
+    3     219
+    Name: victory_status, dtype: int64
+    0.7710670804487945
+    0.5824526420737787
     
 
 
 ```python
-plot_confusion_matrix(xgb_rf, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(xgb_rf, X_test, y_test, normalize='true')
 ```
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a398401668>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a0063fee80>
+
+
+
+
+![png](output_81_1.png)
+
+
+
+```python
+plot_importance(xgb_rf.fit(X_train, y_train))
+```
+
+
+
+
+    rated            0.00
+    turns            0.02
+    white_rating     0.01
+    black_rating     0.01
+    opening_ply      0.01
+    game_time        0.02
+    winner_black     0.40
+    winner_draw      0.38
+    winner_white     0.14
+    eco_category_A   0.00
+    eco_category_B   0.00
+    eco_category_C   0.00
+    eco_category_D   0.00
+    eco_category_E   0.00
+    dtype: float32
 
 
 
@@ -2048,22 +2133,83 @@ plot_confusion_matrix(xgb_rf, X_test, y_test, normalize='true', display_labels=[
 ![png](output_82_1.png)
 
 
+### High Depth XGBoost With Feature Removed
+
 
 ```python
-plot_importance(xgb_rf.fit(X_train, y_train))
-plt.xlabel("Feature Importance")
-plt.ylabel("Feature Name")
+X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True, drop_cols=['victory_status',
+                                                                               'winner_draw',
+                                                                               'winner_black'])
+
+xgb_rf = XGBRFClassifier(max_depth=10)
+xgb_rf.fit(X_train, y_train)
+print(xgb_rf.score(X_train, y_train))
+print(xgb_rf.score(X_test,y_test))
+```
+
+    3    8386
+    2    8386
+    1    8386
+    0    8386
+    dtype: int64
+    0    2761
+    1    1617
+    2     405
+    3     232
+    Name: victory_status, dtype: int64
+    0.7169091342714047
+    0.5106679960119641
+    
+
+
+```python
+plot_confusion_matrix(xgb_rf, X_test, y_test, normalize='true')
 ```
 
 
 
 
-    Text(0, 0.5, 'Feature Name')
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a032a805c0>
 
 
 
 
-![png](output_83_1.png)
+![png](output_85_1.png)
+
+
+
+```python
+plot_importance(xgb_rf.fit(X_train, y_train), drop_cols=['victory_status',
+                                                         'winner_draw'])
+```
+
+
+    ---------------------------------------------------------------------------
+
+    ValueError                                Traceback (most recent call last)
+
+    <ipython-input-127-e5f100f86e91> in <module>
+          1 plot_importance(xgb_rf.fit(X_train, y_train), drop_cols=['victory_status',
+    ----> 2                                                          'winner_draw'])
+    
+
+    <ipython-input-17-896f0dc7cae9> in plot_importance(model, top_n, figsize, drop_cols)
+         50 def plot_importance(model,top_n=20,figsize=(10,10), drop_cols=['victory_status']):
+         51     df_importance = pd.Series(model.feature_importances_,
+    ---> 52                               index=df.drop(drop_cols, axis=1).columns)
+         53     df_importance.sort_values(ascending=True).tail(top_n).plot(
+         54         kind='barh',figsize=figsize)
+    
+
+    ~\Anaconda3\envs\learn-env\lib\site-packages\pandas\core\series.py in __init__(self, data, index, dtype, name, copy, fastpath)
+        300                         raise ValueError(
+        301                             "Length of passed values is {val}, "
+    --> 302                             "index implies {ind}".format(val=len(data), ind=len(index))
+        303                         )
+        304                 except TypeError:
+    
+
+    ValueError: Length of passed values is 12, index implies 13
 
 
 ## Random Forest With Gridsearch
@@ -2073,14 +2219,16 @@ plt.ylabel("Feature Name")
 X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True)
 ```
 
-    2    7494
-    1    7494
-    0    7494
+    3    8385
+    2    8385
+    1    8385
+    0    8385
     dtype: int64
-    0    2507
-    1    2281
-    2     227
-    Name: winner, dtype: int64
+    0    2762
+    1    1583
+    2     432
+    3     238
+    Name: victory_status, dtype: int64
     
 
 
@@ -2090,89 +2238,180 @@ go_ahead = input("Cell will take several minutes to run. Do you wish to run this
 if go_ahead == 'y':
 
     rf_clf = RandomForestClassifier()
-    grid = {'max_depth': [3,5,10,None],
-            'criterion': ['gini','entropy'],
-            'min_samples_split':[20,30,50],
-            'min_samples_leaf':[10,30]}
+    grid = {'max_depth': [1,2,5,8,10],
+            'criterion': ['gini'],
+            'min_samples_split':[2,5,10],
+            'min_samples_leaf':[1,3,5],
+            'max_features': [1,3,5,10,14]}
 
     gridsearch = GridSearchCV(rf_clf, param_grid=grid, cv=5)
 
     forest_cv = gridsearch.fit(X_train, y_train)
-    
-    best_params = forest_cv.best_params_
 
-    print(best_params)
+    print(forest_cv.best_params_)
     
 else:
     
-    best_params = {'criterion': 'gini', 
-                   'max_depth': 10, 
-                   'max_features': 3, 
-                   'min_samples_leaf': 1, 
-                   'min_samples_split': 2}
+    forest_cv.best_params_ = {'criterion': 'gini', 
+                              'max_depth': 10, 
+                              'max_features': 3, 
+                              'min_samples_leaf': 1, 
+                              'min_samples_split': 2}
     
-    print(best_params)
+print(forest_cv.best_params_)
 ```
 
-    Cell will take several minutes to run. Do you wish to run this cell (y/n)? n
+    Cell will take several minutes to run. Do you wish to run this cell (y/n)? no
     {'criterion': 'gini', 'max_depth': 10, 'max_features': 3, 'min_samples_leaf': 1, 'min_samples_split': 2}
     
 
 
 ```python
-forest = RandomForestClassifier(**best_params)
+forest = RandomForestClassifier(**forest_cv.best_params_)
 forest.fit(X_train, y_train)
 
 print(forest.score(X_train, y_train))
 print(forest.score(X_test, y_test))
 ```
 
-    0.7369006316164043
-    0.5744765702891326
+    0.7615384615384615
+    0.5491525423728814
     
 
 
 ```python
-plot_confusion_matrix(forest, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(forest, X_test, y_test, normalize='true')
 ```
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a397943320>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a02a5ebf98>
 
 
 
 
-![png](output_88_1.png)
+![png](output_91_1.png)
 
 
 
 ```python
-sns.set_context('talk')
-plot_importance(forest.fit(X_train, y_train))
-plt.xlabel("Feature Importance")
-plt.ylabel("Feature Name")
+plot_importance(forest.fit(X_train, y_train), drop_cols=['victory_status'])
 ```
 
 
 
 
-    Text(0, 0.5, 'Feature Name')
+    rated            0.01
+    turns            0.09
+    white_rating     0.05
+    black_rating     0.05
+    opening_ply      0.04
+    game_time        0.07
+    winner_black     0.14
+    winner_draw      0.42
+    winner_white     0.12
+    eco_category_A   0.00
+    eco_category_B   0.00
+    eco_category_C   0.00
+    eco_category_D   0.00
+    eco_category_E   0.00
+    dtype: float64
 
 
 
 
-![png](output_89_1.png)
+![png](output_92_1.png)
 
+
+### Gridsearched Random Forest With Features Removed
+
+
+```python
+X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True, 
+                                         drop_cols=['victory_status',
+                                                    'winner_draw',
+                                                    'winner_black'])
+
+forest = RandomForestClassifier(**forest_cv.best_params_)
+forest.fit(X_train, y_train)
+
+print(forest.score(X_train, y_train))
+print(forest.score(X_test, y_test))
+```
+
+    3    8361
+    2    8361
+    1    8361
+    0    8361
+    dtype: int64
+    0    2786
+    1    1597
+    2     427
+    3     205
+    Name: victory_status, dtype: int64
+    0.7046704939600527
+    0.4929212362911266
+    
+
+
+```python
+plot_confusion_matrix(forest, X_test, y_test, normalize='true')
+```
+
+
+
+
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a02a509a20>
+
+
+
+
+![png](output_95_1.png)
+
+
+
+```python
+plot_importance(forest.fit(X_train, y_train), drop_cols=['victory_status',
+                                                         'winner_draw',
+                                                         'winner_black'])
+```
+
+
+
+
+    rated            0.02
+    turns            0.21
+    white_rating     0.12
+    black_rating     0.11
+    opening_ply      0.09
+    game_time        0.17
+    winner_white     0.23
+    eco_category_A   0.01
+    eco_category_B   0.01
+    eco_category_C   0.01
+    eco_category_D   0.01
+    eco_category_E   0.01
+    dtype: float64
+
+
+
+
+![png](output_96_1.png)
+
+
+It's interesting to note that despite dropping two `winner` columns, we were still able to predict draws with 60% accuracy. Let's see what a single tree looks like with these columns removed.
 
 ### Single Tree With Gridsearch Parameters
 
 
 ```python
-X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True)
+X_train, X_test, y_train, y_test = smote(scaled=True, verbose=True, 
+                                         drop_cols=['victory_status',
+                                                    'winner_draw',
+                                                    'winner_black'])
 
-tree = DecisionTreeClassifier(**best_params)
+tree = DecisionTreeClassifier(**forest_cv.best_params_)
 
 tree.fit(X_train, y_train)
 
@@ -2180,22 +2419,30 @@ print(tree.score(X_train, y_train))
 print(tree.score(X_test, y_test))
 ```
 
-    2    7504
-    1    7504
-    0    7504
+    3    8328
+    2    8328
+    1    8328
+    0    8328
     dtype: int64
-    0    2497
-    1    2289
-    2     229
-    Name: winner, dtype: int64
-    0.6094083155650319
-    0.47357926221335994
+    0    2819
+    1    1536
+    2     435
+    3     225
+    Name: victory_status, dtype: int64
+    0.5724363592699327
+    0.4081754735792622
     
 
 
 ```python
+from sklearn.tree import export_graphviz
+from IPython.display import Image  
+from pydotplus import graph_from_dot_data
+import numpy as np
+
 dot_data = export_graphviz(tree, out_file=None, 
-                           feature_names=X.columns,  
+                           feature_names=X.drop(['winner_draw',
+                                                'winner_black'], axis=1).columns,  
                            class_names=y.unique().astype('str'), 
                            filled=True, rounded=True, special_characters=True,
                            rotate=True)
@@ -2205,39 +2452,39 @@ graph = graph_from_dot_data(dot_data)
 Image(graph.create_png())
 ```
 
-    dot: graph is too large for cairo-renderer bitmaps. Scaling by 0.681907 to fit
+    dot: graph is too large for cairo-renderer bitmaps. Scaling by 0.453234 to fit
     
     
 
 
 
 
-![png](output_92_1.png)
+![png](output_100_1.png)
 
 
 
 
 ```python
-plot_confusion_matrix(tree, X_test, y_test, normalize='true', display_labels=['White','Black','Draw'], cmap='OrRd')
+plot_confusion_matrix(tree, X_test, y_test, normalize='true')
 ```
 
 
 
 
-    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a3c20278d0>
+    <sklearn.metrics._plot.confusion_matrix.ConfusionMatrixDisplay at 0x2a031c8eac8>
 
 
 
 
-![png](output_93_1.png)
+![png](output_101_1.png)
 
 
 # Which Model is Best?
 
-After running what seems like a dozen or more models, the next task is to choose the best one. Judging by raw accuracy, this seems to be the Gradient Boosted Random Forest; an overall accuracy of over 80% is extremely impressive, and no other model appears to even come close to this value. While its success of predicting draws is not something to write home about, this can most likely be remedied by procuring more data about draws. 
+After running what seems like a dozen or more models, the next task is to choose the best one. Judging by raw accuracy, this seems to be the Low Depth Random Forest; this is strange, considering we ran a gridsearch to determine a set of values that performed worse than the default settings. High Depth XGBoost is also a front-runner, especially given its high accuracy-to-runtime ratio. 
 
-# Conclusion and Recommendations
+The attribute that all these models have in common is an accuracy "ceiling" of around 64%. It's possible we might be able to edge over that with enough hyperparameter tuning, but it might also be literally impossible to get higher accuracy with the data we have at our disposal. We should consider that 60% accuracy is over twice as good as random guessing, and with this motivation, we should then pick models that have as little overfitting as possible, i.e. models that predict both training data and testing data with accuracy as close to 60% accuracy as possible. For these reasons, it is in our best interest to select the Low Depth Random Forest model. It has the highest overall accuracy rating, while still having an acceptable amount of overfitting and runtime.
 
-Using a Gradient Boosted Random Forest model allows us to predict the endings of chess matches with over 80% accuracy, nearly twice as accurate as weighted guessing, and nearly 2.5 times as accurate as random guessing. Additionally, the model considers the turn count and the starting game time to account for 58% of its prediction. Draws are somewhat difficult to predict, perhaps owing to their relative rarity compared to either player winning outright, but further exploration of stalemate games might remedy this as well.
+# Conclusion
 
-In discussing the results of the Gradient Boosted Random Forest model's predictions, two possible recommendations for players and/or coaches would be to point out that longer game times generally lead to Draws, and higher move counts generally favor Black, with the highest move counts also encouraging Draws. For example, when playing as Black, aiming to extend the game's turn count will give a statistical advantage.
+Using a Low Depth Random Forest model allows us to predict the endings of chess matches with over 60% accuracy, nearly 1.5 times as accurate as weighted guessing, and nearly 2.5 times as accurate as random guessing. 
